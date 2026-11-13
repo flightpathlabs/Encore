@@ -1,0 +1,26 @@
+name: An idea or a request
+description: Something Encore could do, or could do better.
+labels: ["idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Encore is meant to stay small. And the game wants a key press or a
+        click for every cast, so ideas that would cast by themselves can't
+        be done, however handy they'd be.
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like it to do?
+      description: Say it the way you'd say it to a friend. No need to know how it would work.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: What would that help you with?
+      description: The problem behind the idea often suggests a better answer than the first one.
+    validations:
+      required: false

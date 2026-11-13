@@ -1,0 +1,37 @@
+name: Something went wrong
+description: An error, a cast that didn't happen, or a count that looks wrong.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you saw, and what you expected to see instead.
+      placeholder: The replace prompt stayed up after I pressed Repeat.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: What were you doing?
+      description: Which enchant, on what kind of item, and whether you clicked the button or used a key.
+    validations:
+      required: false
+
+  - type: textarea
+    id: error
+    attributes:
+      label: An error message, if the game showed one
+      description: Turn on Lua errors with `/console scriptErrors 1`, and copy the whole message here.
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: addons
+    attributes:
+      label: Other profession addons you use
+      description: SkillUp Forever, Profession Atlas and the like. Encore shares the Professions window with them.
+    validations:
+      required: false
