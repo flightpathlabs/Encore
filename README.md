@@ -1,5 +1,8 @@
 # Encore
 
+> **Not released yet.** Encore is still being built and tested on the `dev`
+> branch, and isn't on CurseForge or Wago. A first release is coming soon.
+
 A small addon for World of Warcraft: Forever, for enchanters who level the
 profession by putting the same enchant on the same item over and over.
 
