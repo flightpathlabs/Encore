@@ -21,20 +21,18 @@ local _, ns = ...
 --   /click EncoreAnswerButton   presses Yes on the replace prompt, if this
 --                               same press opened one
 --
--- Both are hidden secure buttons pointed at Blizzard's buttons just before
--- the press goes through, so the client casts and answers as its own code.
--- The prompt is only ever answered when this button's press opened it,
--- never one the player brought up some other way.
+-- Both are hidden secure buttons pointed at Blizzard's buttons: the first
+-- just before the press goes through, the second the moment the prompt
+-- opens, between the macro's two lines. So the client casts and answers as
+-- its own code. The prompt is only ever answered when this button's press
+-- opened it, never one the player brought up some other way.
 
 -- The prompt the game raises before the window's enchant slot replaces an
--- enchant. REPLACE_ENCHANT is left out on purpose: that one comes from an
--- enchant or kit put on by hand with the cursor, which is never ours.
+-- enchant. It opens during the Enchant button's press (the game fires it
+-- as a synchronous event), so it always opens inside this button's press.
+-- REPLACE_ENCHANT is left out on purpose: that one comes from an enchant
+-- or kit put on by hand with the cursor, which is never ours.
 local REPLACE_PROMPT = "REPLACE_TRADESKILL_ENCHANT"
-
--- If the prompt turns up a moment after the press rather than during it,
--- it still counts as that press's own for this long, in seconds, and the
--- next press answers it.
-local PROMPT_GRACE = 2
 
 local LABEL = "Enchant, skip confirm"
 
@@ -46,14 +44,15 @@ local skipButton
 
 local castGUID -- the enchant this button cast, while it's underway
 local pressing = false -- between a press's PreClick and PostClick
-local lastPress = 0
-local promptWhich -- a replace prompt that one of this button's presses opened
+local promptWhich -- a replace prompt this button's press opened and left up
 
 --- A hidden secure button that presses whichever button its "clickbutton"
---- attribute names. The macro reaches it by its global name.
+--- attribute names. The macro reaches it by its global name. Its
+--- attributes start with "*" so they still match with Shift, Ctrl or Alt
+--- held, which they still are when the macro's /click runs.
 local function CreateClicker(name)
     local button = CreateFrame("Button", name, UIParent, "SecureActionButtonTemplate")
-    button:SetAttribute("type", "click")
+    button:SetAttribute("*type1", "click")
     -- /click sends a button-up press. Forever acts on key-down by default
     -- (ActionButtonUseKeyDown), so without this the press would be ignored.
     button:SetAttribute("useOnKeyDown", false)
@@ -104,7 +103,7 @@ end
 local function ArmAnswer(which)
     local _, dialog = StaticPopup_Visible(which)
     local yes = dialog and dialog.ButtonContainer and dialog.ButtonContainer.Button1
-    answerButton:SetAttribute("clickbutton", yes)
+    answerButton:SetAttribute("*clickbutton1", yes)
 end
 
 -- Runs before the secure press. Everything it decides goes into the
@@ -115,8 +114,8 @@ local function PreClick(self, mouseButton)
         return
     end
 
-    -- A prompt from an earlier press that's still waiting, because it
-    -- arrived a moment late: this press answers it, and the cast goes on.
+    -- A prompt the last press opened but didn't get to answer: this press
+    -- answers it, and the cast goes on.
     if promptWhich and StaticPopup_Visible(promptWhich) then
         ArmAnswer(promptWhich)
         self:SetAttribute("*macrotext1", ANSWER_LINE)
@@ -138,18 +137,17 @@ local function PreClick(self, mouseButton)
         castGUID = nil
     end
 
-    castButton:SetAttribute("clickbutton", page.CreateButton)
+    castButton:SetAttribute("*clickbutton1", page.CreateButton)
     self:SetAttribute("*macrotext1", CAST_LINE .. "\n" .. ANSWER_LINE)
     pressing = true
-    lastPress = GetTime()
 end
 
 local function PostClick(self)
     pressing = false
     if not InCombatLockdown() then
         self:SetAttribute("*macrotext1", nil)
-        castButton:SetAttribute("clickbutton", nil)
-        answerButton:SetAttribute("clickbutton", nil)
+        castButton:SetAttribute("*clickbutton1", nil)
+        answerButton:SetAttribute("*clickbutton1", nil)
     end
 end
 
@@ -160,12 +158,15 @@ hooksecurefunc("StaticPopup_Show", function(which)
     if which ~= REPLACE_PROMPT then
         return
     end
-    if not pressing and GetTime() - lastPress > PROMPT_GRACE then
+    if not pressing then
+        -- Opened by the window's own Enchant button, not by this one: it's
+        -- the player's to answer, and any earlier one of ours is gone.
+        promptWhich = nil
         return
     end
 
     promptWhich = which
-    if pressing and not InCombatLockdown() then
+    if not InCombatLockdown() then
         ArmAnswer(which)
     end
 end)
@@ -186,6 +187,19 @@ local function ShowTooltip(self)
 end
 
 local function Build()
+    -- The Professions window loads the first time it's needed, which can be
+    -- mid-fight (a recipe link clicked, say). A secure button can't be set
+    -- up then, so wait for the fight to end.
+    if InCombatLockdown() then
+        local waiter = CreateFrame("Frame")
+        waiter:RegisterEvent("PLAYER_REGEN_ENABLED")
+        waiter:SetScript("OnEvent", function(self)
+            self:UnregisterAllEvents()
+            Build()
+        end)
+        return
+    end
+
     page = ProfessionsFrame.CraftingPage
 
     -- The window's own Enchant All button and count box sit here for a
@@ -228,12 +242,12 @@ end)
 -- The client can hand these payloads over as secret values; ns.Readable
 -- turns those into nil, which never matches, so such a cast is ignored.
 
-ns.OnPlayerEvent("UNIT_SPELLCAST_START", function(guid, spellID)
-    if pressing or GetTime() - lastPress < PROMPT_GRACE then
-        local recipeID = Selection()
-        if recipeID and ns.Readable(spellID) == recipeID then
-            castGUID = ns.Readable(guid)
-        end
+-- A cast that starts during this button's press is its enchant: the start
+-- is reported straight away, inside the press. That saves assuming the
+-- enchant's spell ID matches the recipe's.
+ns.OnPlayerEvent("UNIT_SPELLCAST_START", function(guid)
+    if pressing then
+        castGUID = ns.Readable(guid)
     end
 end)
 

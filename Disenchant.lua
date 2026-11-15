@@ -11,10 +11,17 @@ local _, ns = ...
 -- what you're wearing, rare and epic items, and anything on Goldwise's Keep
 -- list. You can still tick those; the list just won't do it for you.
 --
--- As with Repeat, the game wants a press for every cast, and nothing here
--- casts from addon code. The Disenchant button is a secure button set to
--- cast Disenchant and point it at one bag slot, which the client's secure
--- button code does as its own.
+-- As with the enchant button, the game wants a press for every cast, and
+-- nothing here casts from addon code. "Disenchant next" is a secure button
+-- running a two-line macro:
+--
+--   /click EncoreDisenchantCast   casts Disenchant on one bag slot
+--   /click EncoreStopTargeting    puts away the glowing targeting hand, if
+--                                 the game turned the item down and left it
+--
+-- Both are hidden secure buttons, so the client's own secure button code
+-- casts, targets and tidies up. Cancelling the targeting from addon code
+-- instead would be blocked: SpellStopTargeting is protected.
 
 local DISENCHANT = 13262
 
@@ -73,9 +80,18 @@ local REFUSALS = {
     "SKILL",
 }
 
--- Any other error on the same item this many presses running is taken as
--- a refusal too, so a name missing above can't leave the button stuck
--- trying one item for ever.
+-- Errors that plainly mean "not now": these never count against an item.
+local PASSING = {
+    "MOVING",
+    "IN_PROGRESS",
+    "NOT_READY",
+    "MOUNTED",
+    "COMBAT",
+}
+
+-- Any other error on the same item this many presses running, with no cast
+-- starting in between, is taken as a refusal too, so a name missing above
+-- can't leave the button stuck trying one item for ever.
 local ERRORS_BEFORE_REFUSAL = 2
 
 -- The loot window that follows a disenchant, if it opens this soon after.
@@ -150,8 +166,8 @@ local function IsUpgrade(bag, slot, itemID, link, equipLoc)
     -- "never an upgrade" when its gear advice is turned off.
     local itemTree = rawget(_G, "ItemTreeAPI")
     if itemTree and itemTree.GetItemFacts then
-        local facts = itemTree.GetItemFacts(itemID, link)
-        local gear = facts and facts.keep and facts.keep.gear
+        local ok, facts = pcall(itemTree.GetItemFacts, itemID, link)
+        local gear = ok and type(facts) == "table" and facts.keep and facts.keep.gear
         if gear then
             return gear.upgrade == true and not gear.off
         end
@@ -392,9 +408,25 @@ local function NextEntry()
     return nil
 end
 
--- Points the secure button at the next item just before the press goes
--- through. PostClick clears it again, so a press this can't vouch for (in
--- combat, say) casts nothing.
+local MACRO = "/click EncoreDisenchantCast\n/click EncoreStopTargeting"
+
+--- A hidden secure button the macro reaches by its global name. Its
+--- attributes start with "*" so they still match with Shift, Ctrl or Alt
+--- held, and it acts on the button-up press /click sends.
+local function CreateHelper(name, actionType)
+    local button = CreateFrame("Button", name, UIParent, "SecureActionButtonTemplate")
+    button:SetAttribute("*type1", actionType)
+    button:SetAttribute("useOnKeyDown", false)
+    button:RegisterForClicks("AnyUp")
+    return button
+end
+
+local castHelper = CreateHelper("EncoreDisenchantCast", "spell")
+CreateHelper("EncoreStopTargeting", "stop")
+
+-- Points the cast at the next item just before the press goes through.
+-- PostClick clears it again, so a press this can't vouch for (in combat,
+-- say) casts nothing.
 local queued = false -- this press was pointed at an item
 
 local function PreClick(self, mouseButton)
@@ -418,9 +450,10 @@ local function PreClick(self, mouseButton)
     current = entry.guid
     pressTime = GetTime()
     queued = true
-    self:SetAttribute("*spell1", DISENCHANT)
-    self:SetAttribute("*target-bag1", entry.bag)
-    self:SetAttribute("*target-slot1", entry.slot)
+    castHelper:SetAttribute("*spell1", DISENCHANT)
+    castHelper:SetAttribute("*target-bag1", entry.bag)
+    castHelper:SetAttribute("*target-slot1", entry.slot)
+    self:SetAttribute("*macrotext1", MACRO)
 end
 
 local function PostClick(self)
@@ -428,23 +461,19 @@ local function PostClick(self)
         return
     end
     queued = false
-    self:SetAttribute("*spell1", nil)
-    self:SetAttribute("*target-bag1", nil)
-    self:SetAttribute("*target-slot1", nil)
-
-    -- If the game turned the item down, it can leave the glowing
-    -- targeting hand behind. Put it away.
-    if SpellIsTargeting() then
-        SpellStopTargeting()
-    end
+    self:SetAttribute("*macrotext1", nil)
+    castHelper:SetAttribute("*spell1", nil)
+    castHelper:SetAttribute("*target-bag1", nil)
+    castHelper:SetAttribute("*target-slot1", nil)
 end
 
-local function IsRefusal(errorType)
+--- Whether the client's name for an error contains any of the patterns.
+local function ErrorMatches(errorType, patterns)
     local name = ns.Readable(errorType) and GetGameMessageInfo(errorType)
     if type(name) ~= "string" then
         return false
     end
-    for _, pattern in ipairs(REFUSALS) do
+    for _, pattern in ipairs(patterns) do
         if name:find(pattern, 1, true) then
             return true
         end
@@ -529,7 +558,7 @@ local function CreateWindow()
     )
     disenchantButton:SetSize(190, 22)
     disenchantButton:SetPoint("BOTTOMRIGHT", -6, 4)
-    disenchantButton:SetAttribute("*type1", "spell")
+    disenchantButton:SetAttribute("*type1", "macro")
     disenchantButton:SetAttribute("useOnKeyDown", false)
     disenchantButton:RegisterForClicks("AnyUp")
     disenchantButton:SetScript("PreClick", PreClick)
@@ -610,26 +639,52 @@ ns.OnEvent("PLAYER_REGEN_ENABLED", Redraw)
 -- straight after the press, often before or without a failed cast: an
 -- item turned down at the targeting step never starts casting at all. So
 -- the error alone decides. A "not now" error (moving, mounted, already
--- casting) leaves the item ticked for another go, unless it keeps coming.
+-- casting) leaves the item ticked for another go. Any other error counts
+-- once per press, and only refuses the item if it keeps coming.
 local errorsFor, errorCount = nil, 0
+local countedPress -- the press time an error was last counted for
 
 ns.OnEvent("UI_ERROR_MESSAGE", function(errorType, message)
     if not current or casting or GetTime() - pressTime > ERROR_WINDOW then
         return
     end
+    local reason = ns.Readable(message) or "The game wouldn't disenchant this."
+    if ErrorMatches(errorType, REFUSALS) then
+        errorsFor, errorCount = nil, 0
+        Refuse(reason)
+        return
+    end
+    if ErrorMatches(errorType, PASSING) or countedPress == pressTime then
+        return
+    end
+    countedPress = pressTime
     if errorsFor ~= current then
         errorsFor, errorCount = current, 0
     end
     errorCount = errorCount + 1
-    if IsRefusal(errorType) or errorCount >= ERRORS_BEFORE_REFUSAL then
+    if errorCount >= ERRORS_BEFORE_REFUSAL then
         errorsFor, errorCount = nil, 0
-        Refuse(ns.Readable(message) or "The game wouldn't disenchant this.")
+        Refuse(reason)
+    end
+end)
+
+-- An item that can still be traded with the people it dropped with makes
+-- the game ask before it's used up. The macro's second line clears the
+-- targeting, which cancels the cast without an error, so it's caught here.
+ns.OnEvent("END_BOUND_TRADEABLE", function()
+    if current and not casting and GetTime() - pressTime <= ERROR_WINDOW then
+        Refuse("Can still be traded. Disenchant it by hand if you're sure.")
     end
 end)
 
 ns.OnPlayerEvent("UNIT_SPELLCAST_START", function(_, spellID)
     if ns.Readable(spellID) == DISENCHANT then
         casting = true
+        -- A cast got going, so earlier errors on this item were passing.
+        errorsFor, errorCount = nil, 0
+        -- The loot follows the cast, so look out for it from here. A
+        -- disenchant's cast is short enough to fit the window.
+        lootAfter = GetTime()
     end
 end)
 
@@ -637,13 +692,14 @@ ns.OnPlayerEvent("UNIT_SPELLCAST_SUCCEEDED", function(_, spellID)
     if ns.Readable(spellID) == DISENCHANT then
         casting = false
         current = nil
-        lootAfter = GetTime()
     end
 end)
 
+-- A cast that didn't finish brings no loot, so stop looking out for it.
 local function CastEnded(_, spellID)
     if ns.Readable(spellID) == DISENCHANT then
         casting = false
+        lootAfter = 0
     end
 end
 
@@ -654,10 +710,13 @@ ns.OnPlayerEvent("UNIT_SPELLCAST_INTERRUPTED", CastEnded)
 -- it never sits in the way of the next press. With the game's auto loot on
 -- there's nothing to do.
 ns.OnEvent("LOOT_READY", function(autoLoot)
-    if autoLoot or GetTime() - lootAfter > LOOT_WINDOW then
+    local ours = GetTime() - lootAfter <= LOOT_WINDOW
+    -- One loot window per disenchant, whoever takes it, so a corpse
+    -- opened straight afterwards is never emptied by mistake.
+    lootAfter = 0
+    if autoLoot or not ours then
         return
     end
-    lootAfter = 0
     for slot = GetNumLootItems(), 1, -1 do
         LootSlot(slot)
     end

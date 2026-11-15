@@ -80,8 +80,6 @@ read_globals = {
     "GetTime",
     "InCombatLockdown",
     "LootSlot",
-    "SpellIsTargeting",
-    "SpellStopTargeting",
     "UnitCastingInfo",
     "issecretvalue",
 }
