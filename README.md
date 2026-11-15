@@ -81,3 +81,12 @@ against the game's own interface code.
 ## Licence
 
 MIT. See [LICENSE](LICENSE).
+
+## More from Flight Path Labs
+
+Small addons for World of Warcraft: Forever, all at
+[github.com/flightpathlabs](https://github.com/flightpathlabs).
+
+- [Gold Wise](https://github.com/flightpathlabs/GoldWise): auction prices for what you carry, and what's worth doing with it.
+- [Creel](https://github.com/flightpathlabs/Creel): a fishing log and one-key cast.
+- [Temper](https://github.com/flightpathlabs/Temper): how your character fights, and whether a change helped. Coming soon.
