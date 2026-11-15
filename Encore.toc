@@ -1,6 +1,6 @@
 ## Interface: 16001
 ## Title: Encore
-## Notes: Repeat one enchant on one item to level Enchanting: one press per cast, the replace prompt answered for you, a count of how many are left, and a stop when the skill-ups end or the materials run out.
+## Notes: For enchanters. One press casts the enchant and skips the "replace the existing enchant?" prompt. And disenchant from a list of your bags, with anything worth keeping unticked first.
 ## Version: 0.1.0
 ## Author: Flight Path Labs
 ## SavedVariables: EncoreDB
@@ -8,4 +8,5 @@
 
 Init.lua
 Repeat.lua
-Settings.lua
+Disenchant.lua
+Commands.lua

@@ -1,9 +1,10 @@
 <!-- Key bindings, found under Options > Keybindings > Encore. The game
-     loads this file by its name; it isn't listed in the TOC. The label is
-     set in Settings.lua.
+     loads this file by its name; it isn't listed in the TOC. The labels are
+     set in Commands.lua.
 
      A CLICK binding presses a named button as if it were clicked, which is
      what a secure button needs: the press counts as the player's own. -->
 <Bindings>
 	<Binding name="CLICK EncoreRepeatButton:LeftButton" category="Encore"/>
+	<Binding name="CLICK EncoreDisenchantButton:LeftButton" category="Encore"/>
 </Bindings>

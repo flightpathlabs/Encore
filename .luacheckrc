@@ -21,9 +21,11 @@ ignore = {
 }
 
 -- The only globals Encore creates: its saved settings and slash command.
--- The named buttons are made through CreateFrame, which luacheck can't see.
+-- The named buttons and window are made through CreateFrame, which
+-- luacheck can't see.
 globals = {
     "SlashCmdList",
+    "UISpecialFrames",
 
     -- Ours
     "EncoreDB",
@@ -36,12 +38,22 @@ read_globals = {
 
     -- Client constants
     "Enum",
+    "BACKPACK_CONTAINER",
+    "NUM_BAG_SLOTS",
+    "NORMAL_FONT_COLOR",
+    "RED_FONT_COLOR",
 
     -- Blizzard's shared Lua helpers
+    "ButtonFrameTemplate_HidePortrait",
+    "CreateDataProvider",
+    "CreateScrollBoxListLinearView",
     "EventUtil",
     "GameTooltip_AddNormalLine",
     "GameTooltip_Hide",
     "GameTooltip_SetTitle",
+    "ItemLocation",
+    "ScrollBoxConstants",
+    "ScrollUtil",
     "StaticPopup_Visible",
     "hooksecurefunc",
 
@@ -50,15 +62,26 @@ read_globals = {
     "UIParent",
     "GameTooltip",
     "ProfessionsFrame",
-    "Settings",
+    "UIErrorsFrame",
 
     -- Namespaced API
-    "C_TradeSkillUI",
+    "C_Container",
+    "C_EquipmentSet",
+    "C_Item",
+    "C_SpellBook",
     "C_Timer",
+    "C_TooltipInfo",
+    "C_TradeSkillUI",
 
     -- Loose API functions
+    "GetGameMessageInfo",
+    "GetInventoryItemLink",
+    "GetNumLootItems",
     "GetTime",
     "InCombatLockdown",
+    "LootSlot",
+    "SpellIsTargeting",
+    "SpellStopTargeting",
     "UnitCastingInfo",
     "issecretvalue",
 }

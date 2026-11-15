@@ -4,13 +4,24 @@
 
 First version.
 
-- A Repeat button beside the Professions window's Enchant button, for an
-  enchant on a single item, with a box for how many casts.
-- One press per cast: it presses the window's own Enchant button and says
-  Yes to the "replace the existing enchant?" prompt.
-- Shows how many casts are left, and stops when the count is done, the
-  materials run out, or the enchant stops giving skill.
-- Right-click the button or type `/encore stop` to end a run early.
-- A key binding for the button, under Options > Keybindings > Encore.
-- Two settings: answer the prompt in the same press, and stop when the
-  skill-ups stop.
+**Enchant, skip confirm**
+
+- A button beside the Professions window's Enchant button, for an enchant
+  on a single item. One press casts the enchant and says Yes to the
+  "replace the existing enchant?" prompt.
+- It presses the window's own Enchant button and the prompt's Yes through
+  the game's secure buttons, and only answers a prompt its own press
+  opened.
+- A key binding for it, under Options > Keybindings > Encore.
+
+**Disenchant from a list**
+
+- A Disenchant All... button on the Professions window while Enchanting is
+  open, or `/encore`, opens a list of the gear in your bags that could be
+  disenchanted, each with a tick box.
+- Gear in an equipment set, gear you've worn, upgrades, rare and epic
+  items, and anything on Goldwise's Keep list start unticked, with the
+  reason shown. Unticked items stay unticked next time.
+- One press per item disenchants the next ticked one, with its own key
+  binding. Encore takes the loot, and an item the game refuses is unticked
+  with the game's reason shown.

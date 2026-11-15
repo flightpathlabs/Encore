@@ -2,30 +2,17 @@ local addonName, ns = ...
 
 -- Encore
 --
--- Enchanters level the profession by putting the same enchant on the same
--- item over and over. The Professions window already casts each one; what
--- it doesn't do is count them, stop at the right moment, or spare you the
--- "replace the existing enchant?" prompt every time. That's all this adds.
+-- Two small helps for enchanters. Repeat.lua puts the same enchant on the
+-- same item again without stopping at the "replace the existing enchant?"
+-- prompt each time. Disenchant.lua lists what in the bags could be
+-- disenchanted, and works through the ticked ones a press at a time.
 --
 -- Everything hangs off the private table the client hands every file in
--- the addon (ns). The only globals are the saved settings, the slash
--- command, the key binding's label and the named buttons in Repeat.lua.
+-- the addon (ns). The only globals are the saved data, the slash command,
+-- the key bindings' labels and the named buttons and window.
 
 ns.name = addonName
 ns.TITLE = "Encore"
-
-ns.DEFAULT_SETTINGS = {
-    -- How many casts a run is, as last typed into the box.
-    count = 10,
-
-    -- Say Yes to the replace prompt in the same press that cast the enchant.
-    answerPrompt = true,
-
-    -- End the run once the enchant can't raise the skill any more.
-    stopWhenNoSkill = true,
-}
-
-ns.MAX_COUNT = 999
 
 local frame = CreateFrame("Frame")
 local handlers = {}
@@ -84,10 +71,13 @@ ns.OnEvent("ADDON_LOADED", function(name)
     end
 
     EncoreDB = EncoreDB or {}
-    for key, value in pairs(ns.DEFAULT_SETTINGS) do
-        if EncoreDB[key] == nil then
-            EncoreDB[key] = value
-        end
-    end
+
+    -- Items unticked in the disenchant list, by item GUID, so they stay
+    -- unticked the next time it opens.
+    EncoreDB.kept = EncoreDB.kept or {}
+
+    -- Left over from a build that had a repeat count and two options.
+    EncoreDB.count, EncoreDB.answerPrompt, EncoreDB.stopWhenNoSkill = nil, nil, nil
+
     ns.settings = EncoreDB
 end)
