@@ -103,7 +103,7 @@ local RESCAN_DELAY = 0.2
 local WIDTH, HEIGHT = 420, 460
 local ROW_HEIGHT = 34
 
-local window, scrollBox, empty, summary, disenchantButton
+local window, scrollBox, empty, summary, disenchantButton, gainedLine, gainedValue
 local entries = {} -- what the list shows, in bag order
 
 -- By item GUID: the player's own tick or untick this session, and the
@@ -497,6 +497,127 @@ local function Refuse(message)
     Redraw()
 end
 
+-- What the disenchants have brought in since the list was opened: each
+-- dust, essence or shard by item ID, in the order first seen.
+local gained = {}
+local gainedOrder = {}
+
+--- What one of an item fetches at auction, from Gold Wise when it's loaded.
+local function AuctionPrice(itemID)
+    local goldwise = rawget(_G, "GoldwiseAPI")
+    if not (goldwise and goldwise.Price) then
+        return nil
+    end
+    local ok, copper = pcall(goldwise.Price, itemID)
+    return ok and type(copper) == "number" and copper or nil
+end
+
+--- The total auction value of everything gained, and whether every item
+--- had a price.
+local function GainedValue()
+    local total, complete = 0, true
+    for _, itemID in ipairs(gainedOrder) do
+        local price = AuctionPrice(itemID)
+        if price then
+            total = total + price * gained[itemID].count
+        else
+            complete = false
+        end
+    end
+    -- A price can be an average, so round to whole copper for display.
+    return math.floor(total + 0.5), complete
+end
+
+local function ShowGained()
+    if not gainedLine then
+        return
+    end
+    if #gainedOrder == 0 then
+        gainedLine:SetText("")
+        gainedValue:SetText("")
+        return
+    end
+    local parts = {}
+    for _, itemID in ipairs(gainedOrder) do
+        local item = gained[itemID]
+        local icon = item.icon and ("|T%s:14:14|t "):format(item.icon) or ""
+        table.insert(parts, icon .. item.count)
+    end
+    gainedLine:SetText("Gained: " .. table.concat(parts, "   "))
+    local total = GainedValue()
+    gainedValue:SetText(total > 0 and ("about " .. GetMoneyString(total)) or "")
+end
+
+local function ResetGained()
+    gained, gainedOrder = {}, {}
+    ShowGained()
+end
+
+-- What's in the loot window a disenchant opened, by slot, waiting to be
+-- counted once it's actually taken. Anything left behind (bags full,
+-- say) never counts.
+local pendingLoot = {}
+
+--- Notes what's in the loot window a disenchant just opened.
+local function NoteLoot()
+    pendingLoot = {}
+    for slot = 1, GetNumLootItems() do
+        local icon, _, quantity = GetLootSlotInfo(slot)
+        local link = GetLootSlotLink(slot)
+        local itemID, _, _, _, itemIcon = nil, nil, nil, nil, nil
+        if link then
+            itemID, _, _, _, itemIcon = C_Item.GetItemInfoInstant(link)
+        end
+        quantity = ns.Readable(quantity)
+        if itemID and quantity and quantity > 0 then
+            pendingLoot[slot] = {
+                itemID = itemID,
+                link = link,
+                icon = icon or itemIcon,
+                quantity = quantity,
+            }
+        end
+    end
+end
+
+--- Adds a taken loot slot to the total.
+local function CountLootSlot(slot)
+    local loot = pendingLoot[slot]
+    if not loot then
+        return
+    end
+    pendingLoot[slot] = nil
+    if not gained[loot.itemID] then
+        gained[loot.itemID] = { count = 0, link = loot.link, icon = loot.icon }
+        table.insert(gainedOrder, loot.itemID)
+    end
+    gained[loot.itemID].count = gained[loot.itemID].count + loot.quantity
+    ShowGained()
+end
+
+local function ShowGainedTooltip(self)
+    if #gainedOrder == 0 then
+        return
+    end
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip_SetTitle(GameTooltip, "Gained since you opened the list")
+    for _, itemID in ipairs(gainedOrder) do
+        local item = gained[itemID]
+        local price = AuctionPrice(itemID)
+        local value = price and GetMoneyString(math.floor(price * item.count + 0.5)) or ""
+        GameTooltip:AddDoubleLine(("%s x%d"):format(item.link, item.count), value, 1, 1, 1, 1, 1, 1)
+    end
+    local total, complete = GainedValue()
+    if total > 0 then
+        GameTooltip_AddBlankLineToTooltip(GameTooltip)
+        GameTooltip_AddNormalLine(GameTooltip, "About " .. GetMoneyString(total) .. " at auction.")
+        if not complete then
+            GameTooltip_AddNormalLine(GameTooltip, "Some have no auction price yet.")
+        end
+    end
+    GameTooltip:Show()
+end
+
 local function CreateWindow()
     window = CreateFrame("Frame", "EncoreDisenchantWindow", UIParent, "ButtonFrameTemplate")
     window:SetSize(WIDTH, HEIGHT)
@@ -524,7 +645,7 @@ local function CreateWindow()
     local inset = window.Inset
     inset:ClearAllPoints()
     inset:SetPoint("TOPLEFT", 8, -72)
-    inset:SetPoint("BOTTOMRIGHT", -6, 28)
+    inset:SetPoint("BOTTOMRIGHT", -6, 50)
 
     scrollBox = CreateFrame("Frame", nil, inset, "WowScrollBoxList")
     scrollBox:SetPoint("TOPLEFT", 4, -4)
@@ -550,6 +671,26 @@ local function CreateWindow()
     summary = window:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     summary:SetPoint("BOTTOMLEFT", 14, 8)
 
+    -- A running total of what's come out, between the list and the button.
+    -- Its own frame, so pointing at it can show the full breakdown.
+    local gainedFrame = CreateFrame("Frame", nil, window)
+    gainedFrame:SetPoint("BOTTOMLEFT", 12, 28)
+    gainedFrame:SetPoint("BOTTOMRIGHT", -12, 28)
+    gainedFrame:SetHeight(20)
+    gainedFrame:SetMouseMotionEnabled(true)
+    gainedFrame:SetScript("OnEnter", ShowGainedTooltip)
+    gainedFrame:SetScript("OnLeave", GameTooltip_Hide)
+    -- The value on the right, so a long row of items can never push it out
+    -- of sight. The tooltip has everything if the items run out of room.
+    gainedValue = gainedFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    gainedValue:SetPoint("RIGHT", -2, 0)
+    gainedValue:SetJustifyH("RIGHT")
+    gainedLine = gainedFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    gainedLine:SetPoint("LEFT", 2, 0)
+    gainedLine:SetPoint("RIGHT", gainedValue, "LEFT", -8, 0)
+    gainedLine:SetJustifyH("LEFT")
+    gainedLine:SetMaxLines(1)
+
     disenchantButton = CreateFrame(
         "Button",
         "EncoreDisenchantButton",
@@ -564,7 +705,11 @@ local function CreateWindow()
     disenchantButton:SetScript("PreClick", PreClick)
     disenchantButton:SetScript("PostClick", PostClick)
 
-    window:SetScript("OnShow", Refresh)
+    -- Each opening of the list starts a fresh total.
+    window:SetScript("OnShow", function()
+        ResetGained()
+        Refresh()
+    end)
 end
 
 --- Opens the list, or closes it if it's open.
@@ -582,12 +727,16 @@ function ns.ToggleDisenchant()
     window:SetShown(not window:IsShown())
 end
 
--- A small button on the Professions window while Enchanting is open.
+-- A small button on the Professions window while Enchanting is open, in
+-- the empty bottom-left corner of the recipe panel. (The top right is taken
+-- by the skill bar and its link button.) The panel's Track Recipe box sits
+-- in the opposite corner at the same height, and the gap on the left is
+-- kept for the "best quality reagents" box some recipes show there.
 local function AddProfessionsButton()
     local page = ProfessionsFrame.CraftingPage
     local button = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
     button:SetSize(130, 22)
-    button:SetPoint("TOPRIGHT", page, "TOPRIGHT", -12, -38)
+    button:SetPoint("BOTTOMLEFT", page.SchematicForm, "BOTTOMLEFT", 64, 8)
     button:SetText("Disenchant All...")
     button:SetScript("OnClick", ns.ToggleDisenchant)
     button:SetScript("OnEnter", function(self)
@@ -692,6 +841,11 @@ ns.OnPlayerEvent("UNIT_SPELLCAST_SUCCEEDED", function(_, spellID)
     if ns.Readable(spellID) == DISENCHANT then
         casting = false
         current = nil
+        -- Give the loot its full window from here, but only if it hasn't
+        -- already come: a closed window stays closed.
+        if lootAfter ~= 0 then
+            lootAfter = GetTime()
+        end
     end
 end)
 
@@ -714,10 +868,22 @@ ns.OnEvent("LOOT_READY", function(autoLoot)
     -- One loot window per disenchant, whoever takes it, so a corpse
     -- opened straight afterwards is never emptied by mistake.
     lootAfter = 0
-    if autoLoot or not ours then
+    if not ours then
+        return
+    end
+    -- Noted now, and counted slot by slot as each is taken, whether by the
+    -- game's auto loot or here.
+    NoteLoot()
+    if autoLoot then
         return
     end
     for slot = GetNumLootItems(), 1, -1 do
         LootSlot(slot)
     end
+end)
+
+ns.OnEvent("LOOT_SLOT_CLEARED", CountLootSlot)
+
+ns.OnEvent("LOOT_CLOSED", function()
+    pendingLoot = {}
 end)

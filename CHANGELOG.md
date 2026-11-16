@@ -25,3 +25,6 @@ First version.
 - One press per item disenchants the next ticked one, with its own key
   binding. Encore takes the loot, and an item the game refuses is unticked
   with the game's reason shown.
+- A running total under the list of the dust, essences and shards gained
+  since it was opened, with an auction value from Gold Wise if it's
+  installed. Point at it for the breakdown.

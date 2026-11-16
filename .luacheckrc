@@ -48,6 +48,7 @@ read_globals = {
     "CreateDataProvider",
     "CreateScrollBoxListLinearView",
     "EventUtil",
+    "GameTooltip_AddBlankLineToTooltip",
     "GameTooltip_AddNormalLine",
     "GameTooltip_Hide",
     "GameTooltip_SetTitle",
@@ -76,6 +77,9 @@ read_globals = {
     -- Loose API functions
     "GetGameMessageInfo",
     "GetInventoryItemLink",
+    "GetLootSlotInfo",
+    "GetLootSlotLink",
+    "GetMoneyString",
     "GetNumLootItems",
     "GetTime",
     "InCombatLockdown",
