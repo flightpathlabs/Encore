@@ -1,88 +1,48 @@
 # Encore
 
-> **Not released yet.** Encore is still being built and tested on the `dev`
-> branch, and isn't on CurseForge or Wago. A first release is coming soon.
+Two small helps for enchanters in World of Warcraft: Forever. Put the same
+enchant on again without the "replace the existing enchant?" prompt, and
+disenchant what you don't need from a list of your bags.
 
-A small addon for World of Warcraft: Forever, for enchanters. It does two
-things:
+![The disenchant list](docs/images/disenchant-list.png)
 
-- **Skip the replace prompt.** Levelling Enchanting often means putting the
-  same enchant on the same item over and over, and every cast stops to ask
-  whether to replace the enchant already there. Encore's button casts and
-  says Yes in one press.
-- **Disenchant from a list.** A window lists everything in your bags you
-  could disenchant. Untick what you want to keep, then press once per item.
-  Anything that looks worth keeping starts unticked.
+**What's in it**
 
-## Enchant, skip confirm
+- **Enchant, skip confirm:** a button beside the Enchanting window's
+  Enchant button. One press casts the enchant and says Yes to replacing
+  the old one.
+- **Disenchant All...:** lists the gear in your bags that can be
+  disenchanted. Untick what you want to keep, then press Disenchant next
+  once for each item.
+- **Running total:** the dust, essences and shards gained so far, with an
+  auction value if you have Gold Wise.
+- **Careful by default:** gear you've worn, gear in an equipment set,
+  upgrades, rare and epic items, and anything on your Gold Wise Keep list
+  start unticked, with the reason shown.
+- **Key bindings** for both buttons, under Options > Keybindings > Encore.
 
-Open Enchanting, pick the enchant, and put the item in the window's
-enchant slot as usual. An **Enchant, skip confirm** button appears beside
-the window's own Enchant button. Each press casts the enchant on the item
-and, if the item already has an enchant, says Yes to replacing it.
+**Getting started**
 
-It's still one press per cast (see below for why). You can put the button
-on a key under Options > Keybindings > Encore and tap that instead.
+Open Enchanting, pick an enchant and put the item in its slot: the Enchant,
+skip confirm button appears. For the disenchant list, press Disenchant
+All... in the same window, or type `/encore`.
 
-It only answers a replace prompt its own press opened. It never answers
-the prompt that asks to make an item soulbound: the first enchant on an
-unbound item is yours to confirm.
+**Notes**
 
-## Disenchanting from a list
+- The game needs a key press or click for every cast, so it's one press
+  per enchant or disenchant. Encore saves the clicks in between.
+- It never answers the prompt that asks to make an item soulbound.
+- Upgrades are judged by ItemTree if you have it, otherwise by item level.
+- Found a bug? Open an issue on
+  [GitHub](https://github.com/flightpathlabs/Encore/issues).
 
-Open it with the **Disenchant All...** button on the Professions window while
-Enchanting is open, or type `/encore`. It lists every green, blue and
-purple weapon or piece of armour in your bags, with a tick box beside each.
+Encore is a fan-made addon, not affiliated with Blizzard Entertainment.
 
-These start unticked, with the reason shown, so nothing you might want
-goes by accident:
+MIT licence, see [LICENSE](LICENSE). Changes are in the
+[changelog](CHANGELOG.md). AI tooling is used openly in making this
+addon; everything is reviewed and tested in game before release.
 
-- gear in one of your equipment sets
-- gear you've worn (bind-on-equip items that have become soulbound)
-- anything better than what you're wearing in that slot, by item level, or
-  by ItemTree's judgement if you have ItemTree
-- rare and epic items
-- anything on your Goldwise Keep list, if you have Goldwise
-
-You can tick any of them yourself. Anything you untick stays unticked the
-next time you open the list.
-
-Then press **Disenchant next** once for each item, or bind a key to it under
-Options > Keybindings > Encore. Each press disenchants the next ticked
-item, and Encore takes the dust and essences from the loot window so it
-never gets in the way. If the game refuses an item (too little skill, say),
-it's unticked and the game's reason shows beside it. The list only acts
-while it's open.
-
-## Why one press per cast
-
-The game requires a real key press or click for every cast, and an addon
-that casts on its own in a loop is what that rule exists to stop. Encore
-doesn't try to get around it. What it saves you is the clicking in between:
-the prompt after each enchant, or picking each item to disenchant.
-
-Encore also never calls the game's crafting functions itself. The enchant
-button presses the Professions window's own Enchant button, and the Yes on
-the prompt, through the game's secure button system, so the client casts as
-if you'd clicked them. The Disenchant button is a secure button too: the
-client casts the spell and points it at the item itself. Crafting called
-from addon code is known to block things like potions afterwards on this
-client, and this way avoids that.
-
-## Notes
-
-The enchant button only shows up for an enchant on a single item. For a
-stack, such as vellum, the window's own Enchant All button already does the
-job.
-
-Encore was written with the help of an AI assistant (Claude) and checked
-against the game's own interface code.
-
-## Licence
-
-MIT. See [LICENSE](LICENSE).
-
-## More from Flight Path Labs
+**More from Flight Path Labs**
 
 Small addons for World of Warcraft: Forever, all at
 [github.com/flightpathlabs](https://github.com/flightpathlabs).

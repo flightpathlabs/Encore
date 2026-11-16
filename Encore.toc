@@ -5,6 +5,7 @@
 ## Author: Flight Path Labs
 ## SavedVariables: EncoreDB
 ## X-License: MIT
+## X-Curse-Project-ID: 1811117
 
 Init.lua
 Repeat.lua
